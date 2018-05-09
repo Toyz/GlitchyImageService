@@ -4,5 +4,5 @@ RUN update-ca-certificates
 
 ADD pw /
 
-EXPOSE 8080
+EXPOSE 1200
 ENTRYPOINT ["/pw"]
