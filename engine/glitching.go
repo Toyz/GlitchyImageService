@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"io"
 	"strings"
+	"sync"
 
 	glitch "github.com/sugoiuguu/go-glitch"
 )
@@ -23,21 +24,32 @@ func gifImage(file io.Reader, expressions []string) (error, *bytes.Buffer, image
 	}
 
 	out := lGif
+	var wg sync.WaitGroup
+
 	for _, expression := range expressions {
+		erro := make(chan error)
+
 		expr, err := glitch.CompileExpression(expression)
 		if err != nil {
 			return err, nil, bounds
 		}
 
-		newImage, err := expr.JumbleGIFPixels(out)
-		if err != nil {
-			out = nil
-			return err, nil, bounds
+		wg.Add(1)
+		go func(wb sync.WaitGroup) {
+			newImage, err := expr.JumbleGIFPixels(out)
+			if err != nil {
+				out = nil
+				erro <- err
+			}
+			out = newImage
+			newImage = nil
+			wb.Done()
+		}(wg)
+		wg.Wait()
+		if <-erro != nil {
+			return <-erro, nil, image.Rectangle{}
 		}
-		out = newImage
-		newImage = nil
 	}
-
 	err = gif.EncodeAll(buff, out)
 	if err != nil {
 		return err, nil, bounds
